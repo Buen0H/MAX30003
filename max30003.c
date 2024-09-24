@@ -22,8 +22,9 @@
  */
  
 #include "max30003.h"
+#include "../nrf52/nil_infant_monitor_peripherals.h"    /* nrf52 files for spi			*/
 
-struct spi_xfer	ecg_spi_msg;
+// struct spi_xfer	ecg_spi_msg;
 uint8_t		ECG_BUF_I[ECG_BUF_SZ];
 uint8_t		ECG_BUF_O[ECG_BUF_SZ];
 
@@ -82,6 +83,16 @@ void ecg_get_mngr_dyn(MAX30003_MNGR_DYN_VALS *vals)
 
     ecg_spi_read(&msg);
 	ecg_decode_mngr_dyn(vals, msg.data);
+}
+void ecg_get_info(MAX30003_INFO_VALS *vals)
+{
+	MAX30003_MSG msg;
+
+	msg.command = ECG_REG_R(REG_INFO);
+	msg.data 	= NULL_DATA;
+
+	ecg_spi_read(&msg);
+	ecg_decode_info(vals, msg.data);
 }
 void ecg_get_cnfg_gen(MAX30003_CNFG_GEN_VALS *vals)
 {
@@ -522,9 +533,9 @@ void ecg_decode_ecg_fifo(MAX30003_FIFO_VALS *vals, const MAX30003_DATA_t DATA)
 	
 	word = DATA.byte[2] & 0x80 ? 0xFF000000 : 0x00000000;
 	/* extract and assign bytes from data word to be endian safe */
-	word |= ((uint32_t)(DATA.byte[2]) << 24 );
-	word |= ((uint32_t)(DATA.byte[1]) << 16 );
-	word |= ((uint32_t)(DATA.byte[0]) << 8  );
+	word |= ((uint32_t)(DATA.byte[2]) << 16 );
+	word |= ((uint32_t)(DATA.byte[1]) << 8 );
+	word |= ((uint32_t)(DATA.byte[0]) << 0 );
 	
 	/* shift values from the 24-bit data word into the value struct */
 	vals->ptag	= (ECGFIFO_PTAG_VAL)( (word & ECGFIFO_PTAG) >> 0);
@@ -739,10 +750,13 @@ uint8_t ecg_spi_read(MAX30003_MSG *msg)
     /* add the command message to the TX buffer */
     ECG_BUF_O[ECG_CMND_POS] = (uint8_t)msg->command;
 
+	/* load dummy data into TX buffer */
+	memcpy(&ECG_BUF_O[ECG_DATA_POS], NULL_DATA.byte, sizeof(NULL_DATA.byte));
+
     /* perform spi transfer */
-    gpio_set_pin_level(MOD_CS, false);
-    xfer_bytes = spi_m_sync_transfer(&SPI_MOD, &ecg_spi_msg);
-    gpio_set_pin_level(MOD_CS, true);
+    // gpio_set_pin_level(MOD_CS, false);
+    xfer_bytes = spi_m_sync_transfer(true, false);
+    // gpio_set_pin_level(MOD_CS, true);
 
     /* arrange the MISO bytes into the data bins */
     msg->data.byte[0] = ECG_BUF_I[3];
@@ -767,9 +781,9 @@ uint8_t ecg_spi_write(MAX30003_MSG *msg)
 
 
     /* perform spi transfer */
-    gpio_set_pin_level(MOD_CS, false);
-    xfer_bytes = spi_m_sync_transfer(&SPI_MOD, &ecg_spi_msg);
-    gpio_set_pin_level(MOD_CS, true);
+    // gpio_set_pin_level(MOD_CS, false);
+    xfer_bytes = spi_m_sync_transfer(true, false);
+    // gpio_set_pin_level(MOD_CS, true);
 
     return xfer_bytes;
 }
@@ -791,71 +805,84 @@ void ecg_get_sample(MAX30003_FIFO_VALS *vals)
 
  int32_t ecg_get_sample_burst(ECG_SAMPLE_t *log, const uint16_t SIZE)
  {
-    bool eof;
-    int  sample;
-    uint16_t step;              /* unit-less time increment */
+    bool eof = false;
+    // int  sample;
+    uint16_t step = 0;    /* unit-less time increment */
 
     MAX30003_MSG msg;
     MAX30003_FIFO_VALS vals;
-    
-    eof = false;
-    step = 0x0000;
      
     /* start the burst transfer, but hold CSB low */
     ECG_BUF_O[ECG_CMND_POS] = ECG_REG_R(REG_ECG_FIFO_BURST);
+	spi_m_sync_transfer(false, false);
 
     /* start collecting samples from FIFO */
-    gpio_set_pin_level(MOD_CS, false);
-    ecg_spi_msg.size = 1;
-    spi_m_sync_transfer(&SPI_MOD, &ecg_spi_msg);
+	msg.data.byte[0] = ECG_BUF_I[3];
+    msg.data.byte[1] = ECG_BUF_I[2];
+    msg.data.byte[2] = ECG_BUF_I[1];
     
-    ecg_spi_msg.size = ECG_BUF_SZ;
-    ECG_BUF_O[ECG_CMND_POS] = 0x00;
+    // ecg_spi_msg.size = ECG_BUF_SZ;
+    // ECG_BUF_O[ECG_CMND_POS] = 0x00;
 
     /* evaluate and store sample, take action if error */
     do {
-        /* get and process samples */
-        if (!(step % 4)) {
-            spi_m_sync_transfer(&SPI_MOD, &ecg_spi_msg);    
-        }
-        
-        sample = (step % 4)*ECG_DATA_SZ;
-        msg.data.byte[0] = ECG_BUF_I[sample + 2];
-        msg.data.byte[1] = ECG_BUF_I[sample + 1];
-        msg.data.byte[2] = ECG_BUF_I[sample + 0];
-        
         ecg_decode_ecg_fifo(&vals, msg.data);
-
         switch (vals.etag) {
             case ETAG_VALID_EOF :
+				log[step].tag 	= vals.etag;
+				log[step].step 	= step;
+				log[step].data 	= vals.data;
+				step++;
+				eof = true;
+				break;
             case ETAG_FAST_EOF  :
+				log[step].tag 	= vals.etag;
+				log[step].step 	= step;
+				log[step].data 	= vals.data;
+				step++;
                 eof = true; /* exit, but save the sample as a valid sample */
+				break;
             case ETAG_VALID     :
+				log[step].tag 	= vals.etag;
+				log[step].step 	= step;
+				log[step].data 	= vals.data;
+				step++;
+				break;
             case ETAG_FAST      :
                 /* format and store the sample */
-                log[step].tag  = vals.etag;
-                log[step].step = step;
-                log[step].data = vals.data;
-             
+				log[step].tag 	= vals.etag;
+				log[step].step 	= step;
+				log[step].data 	= vals.data;
+				step++;
                 /* increment, clear, and get next sample */
-                step++;
                 break;
-
             case ETAG_FIFO_OVERFLOW :
-                gpio_set_pin_level(MOD_CS, true);
-                ecg_fifo_reset(); /* or synch */
+				log[step].tag 	= vals.etag;
+                // gpio_set_pin_level(MOD_CS, true);
+				// dummy read to release CSB line.
+				// spi_m_sync_transfer(true);
+                // ecg_fifo_reset(); /* or synch */
+				eof=true;
+				break;
             case ETAG_FIFO_EMPTY    :
                 eof = true;
                 break;
             default : 
-                gpio_set_pin_level(MOD_CS, true);
-                ecg_synch();
+                // gpio_set_pin_level(MOD_CS, true);
+				// spi_m_sync_transfer(true);
+                // ecg_synch();
+				eof = true;
                 break; /* TODO error handling */
         }
+		spi_m_sync_transfer(false, true);
+		msg.data.byte[0] = ECG_BUF_I[2];
+    	msg.data.byte[1] = ECG_BUF_I[1];
+    	msg.data.byte[2] = ECG_BUF_I[0];
     } while (!eof && step < SIZE);
      
     /* done sampling spi */
-    gpio_set_pin_level(MOD_CS, true);
+	spi_m_sync_transfer(true, true);
+    // gpio_set_pin_level(MOD_CS, true);
      
     return step;
  }

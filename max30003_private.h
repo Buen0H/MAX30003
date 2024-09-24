@@ -32,10 +32,10 @@ extern "C"
 #include <stdbool.h>
 #include <stdint.h>
 
-#define MAX30003_W_INDICATOR    (0)
-#define MAX30003_R_INDICATOR    (1)
-#define MAX30003_DATA_BYTES     (3)
-#define MAX30003_CMND_BYTES     (1)
+// #define MAX30003_W_INDICATOR    (0)
+// #define MAX30003_R_INDICATOR    (1)
+// #define MAX30003_DATA_BYTES     (3)
+// #define MAX30003_CMND_BYTES     (1)
 
 /**
  * REG addresses for the MAX30003 biopotential AFE

@@ -31,16 +31,22 @@ extern "C"
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "ecg_types.h"
-#include "max30003_private.h"	/* typedefs for the MAX30003 registers	*/
-#include "driver_init.h"	    /* "Atmel Start" files for spi			*/
+#include "max30003_private.h"	                        /* typedefs for the MAX30003 registers	*/
+// #include "driver_init.h"	                            /* "Atmel Start" files for spi			*/
+
+#define MAX30003_W_INDICATOR    (0)
+#define MAX30003_R_INDICATOR    (1)
+#define MAX30003_DATA_BYTES     (3)
+#define MAX30003_CMND_BYTES     (1)
 
 /* MACROS for applying a read/write bit and shift to register address values */
 #define ECG_REG_R(REG)  ( (uint8_t)(REG << 1) | MAX30003_R_INDICATOR )
 #define ECG_REG_W(REG)  ( (uint8_t)(REG << 1) | MAX30003_W_INDICATOR )
 
-#define ECG_BUF_SZ      (12)	/* SPI buffer size	                        */
+#define ECG_BUF_SZ      (4)	/* SPI buffer size	                        */
 #define ECG_BUF_CLR     (0x00)	/* clear byte		                        */
 #define ECG_TIMEOUT     (4)     /* number of attempts for reading buffer    */
 
@@ -49,7 +55,7 @@ extern "C"
 #define ECG_DATA_SZ		(3)
 
 /* SPI variables */
-extern struct spi_xfer ecg_spi_msg;		/* SPI message struct	*/
+// extern struct spi_xfer ecg_spi_msg;		/* SPI messagee struct	*/
 extern uint8_t	ECG_BUF_I[ECG_BUF_SZ];	/* SPI input buffer		*/
 extern uint8_t	ECG_BUF_O[ECG_BUF_SZ];	/* SPI output buffer	*/
 
@@ -99,6 +105,7 @@ void ecg_get_en_int		(MAX30003_EN_INT_VALS		*vals);
 void ecg_get_en_int2	(MAX30003_EN_INT_VALS		*vals);
 void ecg_get_mngr_int	(MAX30003_MNGR_INT_VALS		*vals);
 void ecg_get_mngr_dyn	(MAX30003_MNGR_DYN_VALS		*vals);
+void ecg_get_info       (MAX30003_INFO_VALS         *vals);
 void ecg_get_cnfg_gen	(MAX30003_CNFG_GEN_VALS		*vals);
 void ecg_get_cnfg_cal	(MAX30003_CNFG_CAL_VALS		*vals);
 void ecg_get_cnfg_emux	(MAX30003_CNFG_EMUX_VALS	*vals);
