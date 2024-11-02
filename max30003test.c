@@ -41,7 +41,7 @@ const MAX30003_CNFG_GEN_VALS CNFGGEN_VALS_DEFAULT = {
 const MAX30003_CNFG_ECG_VALS CNFECG_VALS_DEFAULT = {
     .dhpf = DHPF_HALF,
     .dlpf = DLPF_40_HZ,
-    .gain = GAIN_20_V,
+    .gain = GAIN_160_V,
     .rate = RATE_MIN_SPS
 };
 const MAX30003_EN_INT_VALS EN_INT_VALS_DEFAULT = {
@@ -53,7 +53,18 @@ const MAX30003_EN_INT_VALS EN_INT2_VALS_DEFAULT = {
     .intb_type = INTBTYPE_NMOS_WITH_PU
 };
 const MAX30003_MNGR_INT_VALS MNGR_INT_VALS_DEFAULT = {
-    .efit = EFIT_AS_24
+    .efit = EFIT_AS_25
+};
+// const MAX30003_CNFG_CAL_VALS CNFG_CAL_VALS_DEFAULT = {
+// 	.en_vcal = ENVCAL_ENABLED,
+// };
+const MAX30003_CNFG_EMUX_VALS CNFG_EMUX_VALS_DEFAULT = {
+	// .calp_sel = CALPSEL_IN_VCALP,
+	// .caln_sel = CALNSEL_IN_VCALN,
+	.openp	= OPENP_CONNECTED,
+	.openn	= OPENN_CONNECTED,
+	.calp_sel = CALPSEL_IN_NONE,
+	.caln_sel = CALNSEL_IN_NONE,
 };
 
 /* constant of masks in each register */
@@ -62,6 +73,8 @@ const MAX30003_MNGR_INT_MASKS MNGR_INT_DEFAULT_MASK = MNGRINT_EFIT;
 const MAX30003_EN_INT_MASKS EN_INT_DEFAULT_MASK = ENINT_INTB_TYPE|ENINT_EN_EINT;
 const MAX30003_EN_INT_MASKS EN_INT2_DEFAULT_MASK = ENINT_INTB_TYPE|ENINT_EN_LONINT;
 const MAX30003_CNFG_GEN_MASKS CNFG_GEN_DEFAULT_MASK = CNFGGEN_EN_ECG;
+// const MAX30003_CNFG_CAL_MASKS CNFG_CAL_DEFAULT_MASK = CNFGCAL_EN_VCAL;
+const MAX30003_CNFG_EMUX_MASKS CNFG_EMUX_DEFAULT_MASK = CNFGEMUX_OPENP|CNFGEMUX_OPENN; //|CNFGEMUX_CALP_SEL|CNFGEMUX_CALN_SEL;
 
 /* global flags and error states */
 TEST_ER test_errno  = TEST_NOERROR;	/* errno for checking why a test has failed */
@@ -122,7 +135,7 @@ test_result_t MAX30003_INIT_TEST_ROUND(){
 	}
 
 	ecg_get_mngr_int(&mngr_int_vals);
-	if(mngr_int_vals.efit==EFIT_AS_24){
+	if(mngr_int_vals.efit==EFIT_AS_25){
 		success++;
 	}
 	if(success==5){
@@ -148,7 +161,7 @@ test_result_t MAX30003_INIT_TEST_ROUND(){
 	if(cnfg_ecg_vals.dlpf == DLPF_40_HZ){
 		success++;
 	}
-	if(cnfg_ecg_vals.gain == GAIN_20_V){
+	if(cnfg_ecg_vals.gain == GAIN_160_V){
 		success++;
 	}
 	if(cnfg_ecg_vals.rate == RATE_MIN_SPS){
@@ -185,6 +198,8 @@ void MAX30003_INIT_SETUP()
 	ecg_set_cnfg_gen(CNFGGEN_VALS_DEFAULT,CNFG_GEN_DEFAULT_MASK);
 	// delay_ms(100);
 	ecg_set_cnfg_ecg(CNFECG_VALS_DEFAULT,CNFG_ECG_DEFAULT_MASK);
+	// ecg_set_cnfg_cal(CNFG_CAL_VALS_DEFAULT, CNFG_CAL_DEFAULT_MASK);
+	ecg_set_cnfg_emux(CNFG_EMUX_VALS_DEFAULT, CNFG_EMUX_DEFAULT_MASK);
 	// delay_ms(100);
 	ecg_synch();
 	// delay_ms(100);
@@ -321,9 +336,9 @@ test_result_t MAX30003_CONFIG_TEST(const uint8_t SPS, const uint8_t GAIN, const 
     }
 
     switch(SPS) {
-        case 0 : vals.rate = RATE_MAX_SPS;
+        case 0 : vals.rate = RATE_MIN_SPS;
                  break;
-        case 1 : vals.rate = RATE_MED_SPS;
+        case 1 : vals.rate = RATE_MIN_SPS;
                  break;
         case 2 : vals.rate = RATE_MIN_SPS;
                  break;
@@ -335,7 +350,7 @@ test_result_t MAX30003_CONFIG_TEST(const uint8_t SPS, const uint8_t GAIN, const 
                  break;
         case 1 : vals.gain = GAIN_40_V;
                  break;
-        case 2 : vals.gain = GAIN_80_V;
+        case 2 : vals.gain = GAIN_160_V;
                  break;
         case 3 : vals.gain = GAIN_160_V;
                  break;
